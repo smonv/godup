@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sync"
 )
 
 var (
@@ -52,18 +53,24 @@ func main() {
 		}
 	}
 
+	wg := &sync.WaitGroup{}
 	for _, files := range allFile {
 		if len(files) > 1 {
-			files = compareHash(files)
-			files = compareByte(files)
-			if len(files) > 1 {
-				fmt.Println("+++o")
-				for _, file := range files {
-					fmt.Println(file.Path)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				files = compareHash(files)
+				files = compareByte(files)
+				if len(files) > 1 {
+					fmt.Println("+++o")
+					for _, file := range files {
+						fmt.Println(file.Path)
+					}
 				}
-			}
+			}()
 		}
 	}
+	wg.Wait()
 }
 
 func walker(path string, fi os.FileInfo, err error) error {

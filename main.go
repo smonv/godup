@@ -57,17 +57,17 @@ func main() {
 	for _, files := range allFile {
 		if len(files) > 1 {
 			wg.Add(1)
-			go func() {
+			go func(files []*File) {
 				defer wg.Done()
-				files = compareHash(files)
-				files = compareByte(files)
-				if len(files) > 1 {
+				sameHash := compareHash(files)
+				sameByte := compareByte(sameHash)
+				if len(sameByte) > 1 {
 					fmt.Println("+++o")
 					for _, file := range files {
 						fmt.Println(file.Path)
 					}
 				}
-			}()
+			}(files)
 		}
 	}
 	wg.Wait()

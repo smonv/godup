@@ -61,7 +61,7 @@ func main() {
 				sameHash := compareHash(files)
 				sameByte := compareByte(sameHash)
 				if len(sameByte) > 1 {
-					fmt.Println("+++o")
+					fmt.Printf("SHA1: %x\n", sameByte[0].Hash)
 					for _, file := range files {
 						fmt.Println(file.Path)
 					}
@@ -100,9 +100,14 @@ func compareHash(files []*File) []*File {
 	for _, i := range files {
 		for _, j := range files {
 			if !reflect.DeepEqual(i, j) {
-				if bytes.Equal(i.Hash, j.Hash) && !checkFilesContain(sameHash, j) && !checkFilesContain(sameHash, i) {
-					sameHash = append(sameHash, i)
-					sameHash = append(sameHash, j)
+				if bytes.Equal(i.Hash, j.Hash) {
+					if !checkFilesContain(sameHash, i) {
+						sameHash = append(sameHash, i)
+					}
+					if !checkFilesContain(sameHash, j) {
+
+						sameHash = append(sameHash, j)
+					}
 				}
 			}
 		}
@@ -137,17 +142,19 @@ func compareByte(files []*File) []*File {
 			if reflect.DeepEqual(i, j) {
 				break
 			}
-			if !checkFilesContain(sameByte, i) && !checkFilesContain(sameByte, j) {
-				f1, err := ioutil.ReadFile(i.Path)
-				if err != nil {
-					panic(err)
-				}
-				f2, err := ioutil.ReadFile(j.Path)
-				if err != nil {
-					panic(err)
-				}
-				if bytes.Equal(f1, f2) {
+			f1, err := ioutil.ReadFile(i.Path)
+			if err != nil {
+				panic(err)
+			}
+			f2, err := ioutil.ReadFile(j.Path)
+			if err != nil {
+				panic(err)
+			}
+			if bytes.Equal(f1, f2) {
+				if !checkFilesContain(sameByte, i) {
 					sameByte = append(sameByte, i)
+				}
+				if !checkFilesContain(sameByte, j) {
 					sameByte = append(sameByte, j)
 				}
 			}

@@ -2,10 +2,9 @@ package main
 
 import (
 	"bytes"
-	"crypto/md5"
+	"crypto/sha1"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -91,7 +90,7 @@ func compareHash(files []*File) []*File {
 	sameHash := []*File{}
 
 	for _, f := range files {
-		hash, err := computeMd5(f.Path)
+		hash, err := computeHash(f.Path)
 		if err != nil {
 			panic(err)
 		}
@@ -101,7 +100,7 @@ func compareHash(files []*File) []*File {
 	for _, i := range files {
 		for _, j := range files {
 			if !reflect.DeepEqual(i, j) {
-				if bytes.Compare(i.Hash, j.Hash) == 0 && !checkFilesContain(sameHash, j) && !checkFilesContain(sameHash, i) {
+				if bytes.Equal(i.Hash, j.Hash) && !checkFilesContain(sameHash, j) && !checkFilesContain(sameHash, i) {
 					sameHash = append(sameHash, i)
 					sameHash = append(sameHash, j)
 				}
@@ -120,17 +119,15 @@ func checkFilesContain(files []*File, file *File) bool {
 	return false
 }
 
-func computeMd5(path string) ([]byte, error) {
-	var result []byte
-	file, err := os.Open(path)
+func computeHash(path string) (result []byte, err error) {
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return result, err
+		return
 	}
-	digest := md5.New()
-	if _, err := io.Copy(digest, file); err != nil {
-		return result, err
-	}
-	return digest.Sum(result), nil
+
+	hash := sha1.Sum(data)
+	result = hash[:]
+	return
 }
 
 func compareByte(files []*File) []*File {

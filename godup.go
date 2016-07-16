@@ -149,7 +149,7 @@ func compareByte(files []*File) []*File {
 				if err != nil {
 					panic(err)
 				}
-				if bytes.Compare(f1, f2) == 0 {
+				if bytes.Equal(f1, f2) {
 					sameByte = append(sameByte, i)
 					sameByte = append(sameByte, j)
 				}

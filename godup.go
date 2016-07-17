@@ -87,9 +87,7 @@ func walker(path string, fi os.FileInfo, err error) error {
 	return nil
 }
 
-func compareHash(files []*File) []*File {
-	sameHash := []*File{}
-
+func compareHash(files []*File) (result []*File) {
 	for _, f := range files {
 		hash, err := computeHash(f.Path)
 		if err != nil {
@@ -102,18 +100,17 @@ func compareHash(files []*File) []*File {
 		for _, j := range files {
 			if !reflect.DeepEqual(i, j) {
 				if bytes.Equal(i.Hash, j.Hash) {
-					if !checkFilesContain(sameHash, i) {
-						sameHash = append(sameHash, i)
+					if !checkFilesContain(result, i) {
+						result = append(result, i)
 					}
-					if !checkFilesContain(sameHash, j) {
-
-						sameHash = append(sameHash, j)
+					if !checkFilesContain(result, j) {
+						result = append(result, j)
 					}
 				}
 			}
 		}
 	}
-	return sameHash
+	return
 }
 
 func checkFilesContain(files []*File, file *File) bool {
@@ -136,8 +133,7 @@ func computeHash(path string) (result []byte, err error) {
 	return
 }
 
-func compareByte(files []*File) []*File {
-	sameByte := []*File{}
+func compareByte(files []*File) (result []*File) {
 	for _, i := range files {
 		for _, j := range files {
 			if reflect.DeepEqual(i, j) {
@@ -152,14 +148,14 @@ func compareByte(files []*File) []*File {
 				panic(err)
 			}
 			if bytes.Equal(f1, f2) {
-				if !checkFilesContain(sameByte, i) {
-					sameByte = append(sameByte, i)
+				if !checkFilesContain(result, i) {
+					result = append(result, i)
 				}
-				if !checkFilesContain(sameByte, j) {
-					sameByte = append(sameByte, j)
+				if !checkFilesContain(result, j) {
+					result = append(result, j)
 				}
 			}
 		}
 	}
-	return sameByte
+	return
 }

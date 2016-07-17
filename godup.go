@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha1"
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -61,7 +61,8 @@ func main() {
 				sameHash := compareHash(files)
 				sameByte := compareByte(sameHash)
 				if len(sameByte) > 1 {
-					fmt.Printf("SHA1: %x\n", sameByte[0].Hash)
+					fmt.Printf("\n")
+					fmt.Printf("SHA256: %x\n", sameByte[0].Hash)
 					for _, file := range files {
 						fmt.Println(file.Path)
 					}
@@ -130,7 +131,7 @@ func computeHash(path string) (result []byte, err error) {
 		return
 	}
 
-	hash := sha1.Sum(data)
+	hash := sha256.Sum256(data)
 	result = hash[:]
 	return
 }

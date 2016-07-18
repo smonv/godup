@@ -3,5 +3,5 @@ CLI tool check file duplicate (small files)
 
 # Usage:
 ```sh
-godup -p path_to_check
+godup path_to_check path_to_check2
 ```

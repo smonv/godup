@@ -14,6 +14,7 @@ import (
 
 var (
 	allFile map[int64][]*File
+	mutex   sync.Mutex
 )
 
 // File struct
@@ -75,6 +76,9 @@ func main() {
 
 func walker(path string, fi os.FileInfo, err error) error {
 	if !fi.IsDir() {
+		mutex.Lock()
+		defer mutex.Unlock()
+
 		file := &File{
 			Name: fi.Name(),
 			Size: fi.Size(),

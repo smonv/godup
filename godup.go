@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -26,31 +25,27 @@ type File struct {
 }
 
 func main() {
-	var cPath string
-	flag.StringVar(&cPath, "p", "", "check path")
-	flag.Parse()
+	defer os.Exit(1)
 
-	if len(cPath) == 0 {
-		fmt.Println("check path not found")
-		os.Exit(1)
-	}
+	paths := os.Args[1:]
 
 	allFile = make(map[int64][]*File)
 
-	src, err := os.Stat(cPath)
-	if err != nil {
-		panic(err)
+	if len(paths) < 1 {
+		fmt.Println("path not found")
+		return
 	}
 
-	if src.IsDir() {
-		fullPath, err := filepath.Abs(cPath)
+	for _, path := range paths {
+		err := checkPath(path)
 		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("Checking %s\n", fullPath)
-		if err = filepath.Walk(fullPath, walker); err != nil {
 			fmt.Println(err)
 		}
+	}
+
+	if len(allFile) == 0 {
+		fmt.Println("cannot find any file")
+		return
 	}
 
 	wg := &sync.WaitGroup{}
@@ -72,6 +67,25 @@ func main() {
 		}
 	}
 	wg.Wait()
+}
+
+func checkPath(path string) error {
+	src, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+
+	if src.IsDir() {
+		fullPath, err := filepath.Abs(path)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Checking %s\n", fullPath)
+		if err = filepath.Walk(fullPath, walker); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func walker(path string, fi os.FileInfo, err error) error {

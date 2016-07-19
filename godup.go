@@ -8,21 +8,15 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sync"
 )
 
 var (
 	allFile map[int64][]*File
 	mutex   sync.Mutex
+	wg      sync.WaitGroup
 )
-
-// File struct
-type File struct {
-	Name string
-	Size int64
-	Path string
-	Hash []byte
-}
 
 func main() {
 	defer os.Exit(1)
@@ -48,25 +42,85 @@ func main() {
 		return
 	}
 
-	wg := &sync.WaitGroup{}
-	for _, files := range allFile {
+	fmt.Printf("found %d files\n", len(allFile))
+
+	done := make(chan struct{})
+	hashc := make(chan []*File)
+	c := make(chan []*File)
+
+	workers := runtime.NumCPU()
+	wg.Add(workers)
+
+	for i := 0; i < workers; i++ {
+		go func() {
+			hashWorker(done, hashc, c)
+			wg.Done()
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(c)
+	}()
+
+	go func() {
+		defer close(hashc)
+		for _, files := range allFile {
+			hashc <- files
+		}
+	}()
+
+	for files := range c {
 		if len(files) > 1 {
-			wg.Add(1)
-			go func(files []*File) {
-				defer wg.Done()
-				sameHash := compareHash(files)
-				sameByte := compareByte(sameHash)
-				if len(sameByte) > 1 {
-					fmt.Printf("\n")
-					fmt.Printf("SHA256: %x\n", sameByte[0].Hash)
-					for _, file := range files {
-						fmt.Println(file.Path)
-					}
-				}
-			}(files)
+			fmt.Printf("Size: %d\n", files[0].Size)
+			for _, file := range files {
+				fmt.Printf("Path: %s\n", file.Name)
+			}
 		}
 	}
-	wg.Wait()
+
+	defer close(done)
+
+	// for _, files := range allFile {
+	// 	if len(files) > 1 {
+	// 		wg.Add(1)
+	// 		go func(files []*File) {
+	// 			defer wg.Done()
+	// 			sameHash := compareHash(files)
+	// 			sameByte := compareByte(sameHash)
+	// 			if len(sameByte) > 1 {
+	// 				fmt.Printf("\n")
+	// 				fmt.Printf("SHA256: %x\n", sameByte[0].Hash)
+	// 				for _, file := range files {
+	// 					fmt.Println(file.Path)
+	// 				}
+	// 			}
+	// 		}(files)
+	// 	}
+	// }
+}
+
+func hashWorker(done chan struct{}, hashc <-chan []*File, c chan<- []*File) {
+	for files := range hashc {
+		select {
+		case c <- hash(files):
+		case <-done:
+			return
+		}
+	}
+}
+
+func hash(files []*File) []*File {
+	for _, file := range files {
+		data, _ := ioutil.ReadFile(file.Path)
+		// if err != nil {
+		// 	return files
+		// }
+
+		hash := sha256.Sum256(data)
+		file.Hash = hash[:]
+	}
+	return files
 }
 
 func checkPath(path string) error {

@@ -111,6 +111,10 @@ func hashWorker(done chan struct{}, hashc <-chan []*File, c chan<- []*File) {
 }
 
 func hash(files []*File) []*File {
+	if len(files) < 2 {
+		return files
+	}
+
 	for _, file := range files {
 		data, _ := ioutil.ReadFile(file.Path)
 		// if err != nil {

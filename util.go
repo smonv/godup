@@ -25,3 +25,10 @@ func checkFilesContain(files []*File, file *File) bool {
 	}
 	return false
 }
+
+func appendNotExistFile(files []*File, file *File) []*File {
+	if !checkFilesContain(files, file) {
+		files = append(files, file)
+	}
+	return files
+}

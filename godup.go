@@ -47,8 +47,8 @@ func main() {
 
 	for i := 0; i < workers; i++ {
 		go func() {
+			defer wg.Done()
 			compareWorker(done, cic, coc)
-			wg.Done()
 		}()
 	}
 
@@ -108,6 +108,7 @@ func walker(path string, fi os.FileInfo, err error) error {
 			Size: fi.Size(),
 			Path: path,
 		}
+
 		files := allFile[file.Size]
 		files = append(files, file)
 		allFile[file.Size] = files

@@ -21,11 +21,12 @@ func compare(files []*File) (result []*File) {
 		result = files
 		return
 	}
-	result = compareHash(files)
 
+	result = compareHash(files)
 	if len(result) < 2 {
 		return
 	}
+
 	result = compareByte(files)
 
 	return
@@ -37,20 +38,19 @@ func compareHash(files []*File) (result []*File) {
 		if err != nil {
 			panic(err)
 		}
+
 		f.Hash = r
 	}
 
 	for _, i := range files {
 		for _, j := range files {
-			if !reflect.DeepEqual(i, j) {
-				if bytes.Equal(i.Hash, j.Hash) {
-					if !checkFilesContain(result, i) {
-						result = append(result, i)
-					}
-					if !checkFilesContain(result, j) {
-						result = append(result, j)
-					}
-				}
+			if reflect.DeepEqual(i, j) {
+				break
+			}
+
+			if bytes.Equal(i.Hash, j.Hash) {
+				result = appendNotExistFile(result, i)
+				result = appendNotExistFile(result, j)
 			}
 		}
 	}
@@ -63,21 +63,20 @@ func compareByte(files []*File) (result []*File) {
 			if reflect.DeepEqual(i, j) {
 				break
 			}
+
 			f1, err := ioutil.ReadFile(i.Path)
 			if err != nil {
 				panic(err)
 			}
+
 			f2, err := ioutil.ReadFile(j.Path)
 			if err != nil {
 				panic(err)
 			}
+
 			if bytes.Equal(f1, f2) {
-				if !checkFilesContain(result, i) {
-					result = append(result, i)
-				}
-				if !checkFilesContain(result, j) {
-					result = append(result, j)
-				}
+				result = appendNotExistFile(result, i)
+				result = appendNotExistFile(result, j)
 			}
 		}
 	}

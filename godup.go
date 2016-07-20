@@ -45,32 +45,32 @@ func main() {
 	fmt.Printf("found %d files\n", len(allFile))
 
 	done := make(chan struct{})
-	hashc := make(chan []*File)
-	c := make(chan []*File)
+	hic := make(chan []*File) // hash input channel
+	hoc := make(chan []*File) // hash output channel
 
 	workers := runtime.NumCPU()
 	wg.Add(workers)
 
 	for i := 0; i < workers; i++ {
 		go func() {
-			hashWorker(done, hashc, c)
+			hashWorker(done, hic, hoc)
 			wg.Done()
 		}()
 	}
 
 	go func() {
 		wg.Wait()
-		close(c)
+		close(hoc)
 	}()
 
 	go func() {
-		defer close(hashc)
+		defer close(hic)
 		for _, files := range allFile {
-			hashc <- files
+			hic <- files
 		}
 	}()
 
-	for files := range c {
+	for files := range hoc {
 		if len(files) > 1 {
 			fmt.Printf("Size: %d\n", files[0].Size)
 			for _, file := range files {

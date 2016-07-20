@@ -45,86 +45,70 @@ func main() {
 	fmt.Printf("found %d files\n", len(allFile))
 
 	done := make(chan struct{})
-	hic := make(chan []*File) // hash input channel
-	hoc := make(chan []*File) // hash output channel
+	cic := make(chan []*File) // compare input channel
+	coc := make(chan []*File) // compare output channel
 
 	workers := runtime.NumCPU()
 	wg.Add(workers)
 
 	for i := 0; i < workers; i++ {
 		go func() {
-			hashWorker(done, hic, hoc)
+			compareWorker(done, cic, coc)
 			wg.Done()
 		}()
 	}
 
 	go func() {
 		wg.Wait()
-		close(hoc)
+		close(coc)
 	}()
 
 	go func() {
-		defer close(hic)
+		defer close(cic)
 		for _, files := range allFile {
-			hic <- files
+			if len(files) > 1 {
+				cic <- files
+			}
 		}
 	}()
 
-	for files := range hoc {
+	for files := range coc {
 		if len(files) > 1 {
-			fmt.Printf("Size: %d\n", files[0].Size)
+			fmt.Printf("\n")
+			fmt.Printf("Size: %d. HASH: %x\n", files[0].Size, files[0].Hash)
 			for _, file := range files {
-				fmt.Printf("Path: %s\n", file.Name)
+				fmt.Printf("Path: %s\n", file.Path)
 			}
 		}
 	}
 
 	defer close(done)
 
-	// for _, files := range allFile {
-	// 	if len(files) > 1 {
-	// 		wg.Add(1)
-	// 		go func(files []*File) {
-	// 			defer wg.Done()
-	// 			sameHash := compareHash(files)
-	// 			sameByte := compareByte(sameHash)
-	// 			if len(sameByte) > 1 {
-	// 				fmt.Printf("\n")
-	// 				fmt.Printf("SHA256: %x\n", sameByte[0].Hash)
-	// 				for _, file := range files {
-	// 					fmt.Println(file.Path)
-	// 				}
-	// 			}
-	// 		}(files)
-	// 	}
-	// }
 }
 
-func hashWorker(done chan struct{}, hashc <-chan []*File, c chan<- []*File) {
-	for files := range hashc {
+func compareWorker(done chan struct{}, cic <-chan []*File, coc chan<- []*File) {
+	for files := range cic {
 		select {
-		case c <- hash(files):
+		case coc <- compare(files):
 		case <-done:
 			return
 		}
 	}
 }
 
-func hash(files []*File) []*File {
+func compare(files []*File) (result []*File) {
 	if len(files) < 2 {
-		return files
+		result = files
+		return
 	}
+	result = compareHash(files)
 
-	for _, file := range files {
-		data, _ := ioutil.ReadFile(file.Path)
-		// if err != nil {
-		// 	return files
-		// }
-
-		hash := sha256.Sum256(data)
-		file.Hash = hash[:]
+	if len(result) < 2 {
+		return
 	}
-	return files
+	result = compareByte(files)
+
+	return
 }
 
 func checkPath(path string) error {
@@ -163,13 +147,24 @@ func walker(path string, fi os.FileInfo, err error) error {
 	return nil
 }
 
+func hash(path string) (result []byte, err error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return
+	}
+
+	hash := sha256.Sum256(data)
+	result = hash[:]
+	return
+}
+
 func compareHash(files []*File) (result []*File) {
 	for _, f := range files {
-		hash, err := computeHash(f.Path)
+		r, err := hash(f.Path)
 		if err != nil {
 			panic(err)
 		}
-		f.Hash = hash
+		f.Hash = r
 	}
 
 	for _, i := range files {
@@ -186,26 +181,6 @@ func compareHash(files []*File) (result []*File) {
 			}
 		}
 	}
-	return
-}
-
-func checkFilesContain(files []*File, file *File) bool {
-	for _, f := range files {
-		if reflect.DeepEqual(f, file) {
-			return true
-		}
-	}
-	return false
-}
-
-func computeHash(path string) (result []byte, err error) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return
-	}
-
-	hash := sha256.Sum256(data)
-	result = hash[:]
 	return
 }
 
@@ -234,4 +209,13 @@ func compareByte(files []*File) (result []*File) {
 		}
 	}
 	return
+}
+
+func checkFilesContain(files []*File, file *File) bool {
+	for _, f := range files {
+		if reflect.DeepEqual(f, file) {
+			return true
+		}
+	}
+	return false
 }

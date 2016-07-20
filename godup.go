@@ -1,13 +1,9 @@
 package main
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"sync"
 )
@@ -19,8 +15,6 @@ var (
 )
 
 func main() {
-	defer os.Exit(1)
-
 	paths := os.Args[1:]
 
 	allFile = make(map[int64][]*File)
@@ -31,7 +25,7 @@ func main() {
 	}
 
 	for _, path := range paths {
-		err := checkPath(path)
+		err := check(path)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -83,35 +77,9 @@ func main() {
 	}
 
 	defer close(done)
-
 }
 
-func compareWorker(done chan struct{}, cic <-chan []*File, coc chan<- []*File) {
-	for files := range cic {
-		select {
-		case coc <- compare(files):
-		case <-done:
-			return
-		}
-	}
-}
-
-func compare(files []*File) (result []*File) {
-	if len(files) < 2 {
-		result = files
-		return
-	}
-	result = compareHash(files)
-
-	if len(result) < 2 {
-		return
-	}
-	result = compareByte(files)
-
-	return
-}
-
-func checkPath(path string) error {
+func check(path string) error {
 	src, err := os.Stat(path)
 	if err != nil {
 		return err
@@ -145,77 +113,4 @@ func walker(path string, fi os.FileInfo, err error) error {
 		allFile[file.Size] = files
 	}
 	return nil
-}
-
-func hash(path string) (result []byte, err error) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return
-	}
-
-	hash := sha256.Sum256(data)
-	result = hash[:]
-	return
-}
-
-func compareHash(files []*File) (result []*File) {
-	for _, f := range files {
-		r, err := hash(f.Path)
-		if err != nil {
-			panic(err)
-		}
-		f.Hash = r
-	}
-
-	for _, i := range files {
-		for _, j := range files {
-			if !reflect.DeepEqual(i, j) {
-				if bytes.Equal(i.Hash, j.Hash) {
-					if !checkFilesContain(result, i) {
-						result = append(result, i)
-					}
-					if !checkFilesContain(result, j) {
-						result = append(result, j)
-					}
-				}
-			}
-		}
-	}
-	return
-}
-
-func compareByte(files []*File) (result []*File) {
-	for _, i := range files {
-		for _, j := range files {
-			if reflect.DeepEqual(i, j) {
-				break
-			}
-			f1, err := ioutil.ReadFile(i.Path)
-			if err != nil {
-				panic(err)
-			}
-			f2, err := ioutil.ReadFile(j.Path)
-			if err != nil {
-				panic(err)
-			}
-			if bytes.Equal(f1, f2) {
-				if !checkFilesContain(result, i) {
-					result = append(result, i)
-				}
-				if !checkFilesContain(result, j) {
-					result = append(result, j)
-				}
-			}
-		}
-	}
-	return
-}
-
-func checkFilesContain(files []*File, file *File) bool {
-	for _, f := range files {
-		if reflect.DeepEqual(f, file) {
-			return true
-		}
-	}
-	return false
 }

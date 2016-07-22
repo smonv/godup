@@ -10,6 +10,7 @@ import (
 
 var (
 	allFile map[int64][]*File
+	count   int64
 	mutex   sync.Mutex
 	wg      sync.WaitGroup
 )
@@ -36,7 +37,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("found %d files\n", len(allFile))
+	fmt.Printf("found %d files\n", count)
 
 	done := make(chan struct{})
 	cic := make(chan []*File) // compare input channel
@@ -102,6 +103,8 @@ func walker(path string, fi os.FileInfo, err error) error {
 	if !fi.IsDir() {
 		mutex.Lock()
 		defer mutex.Unlock()
+
+		count++
 
 		file := &File{
 			Name: fi.Name(),

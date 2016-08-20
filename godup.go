@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,8 @@ var (
 	count   int64
 	mutex   sync.Mutex
 	wg      sync.WaitGroup
+	ctx     context.Context
+	cancel  context.CancelFunc
 )
 
 func main() {
@@ -39,7 +42,9 @@ func main() {
 
 	fmt.Printf("found %d files\n", count)
 
-	done := make(chan struct{})
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
 	cic := make(chan []*File) // compare input channel
 	coc := make(chan []*File) // compare output channel
 
@@ -49,7 +54,7 @@ func main() {
 	for i := 0; i < workers; i++ {
 		go func() {
 			defer wg.Done()
-			compareWorker(done, cic, coc)
+			compareWorker(ctx, cic, coc)
 		}()
 	}
 
@@ -76,8 +81,6 @@ func main() {
 			}
 		}
 	}
-
-	defer close(done)
 }
 
 func check(path string) error {

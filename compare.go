@@ -2,15 +2,16 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"reflect"
 )
 
-func compareWorker(done chan struct{}, cic <-chan []*File, coc chan<- []*File) {
+func compareWorker(ctx context.Context, cic <-chan []*File, coc chan<- []*File) {
 	for files := range cic {
 		select {
 		case coc <- compare(files):
-		case <-done:
+		case <-ctx.Done():
 			return
 		}
 	}

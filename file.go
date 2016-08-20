@@ -1,4 +1,4 @@
-package main
+package godup
 
 // File struct
 type File struct {

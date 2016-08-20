@@ -1,4 +1,4 @@
-package main
+package godup
 
 import (
 	"bytes"
@@ -7,7 +7,8 @@ import (
 	"reflect"
 )
 
-func compareWorker(ctx context.Context, cic <-chan []*File, coc chan<- []*File) {
+// CompareWorker ...
+func CompareWorker(ctx context.Context, cic <-chan []*File, coc chan<- []*File) {
 	for files := range cic {
 		select {
 		case coc <- compare(files):

@@ -7,10 +7,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+
+	"github.com/tthanh/godup"
 )
 
 var (
-	allFile map[int64][]*File
+	allFile map[int64][]*godup.File
 	count   int64
 	mutex   sync.Mutex
 	wg      sync.WaitGroup
@@ -21,7 +23,7 @@ var (
 func main() {
 	paths := os.Args[1:]
 
-	allFile = make(map[int64][]*File)
+	allFile = make(map[int64][]*godup.File)
 
 	if len(paths) < 1 {
 		fmt.Println("path not found")
@@ -45,8 +47,8 @@ func main() {
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	cic := make(chan []*File) // compare input channel
-	coc := make(chan []*File) // compare output channel
+	cic := make(chan []*godup.File) // compare input channel
+	coc := make(chan []*godup.File) // compare output channel
 
 	workers := runtime.NumCPU()
 	wg.Add(workers)
@@ -54,7 +56,7 @@ func main() {
 	for i := 0; i < workers; i++ {
 		go func() {
 			defer wg.Done()
-			compareWorker(ctx, cic, coc)
+			godup.CompareWorker(ctx, cic, coc)
 		}()
 	}
 
@@ -109,7 +111,7 @@ func walker(path string, fi os.FileInfo, err error) error {
 
 		count++
 
-		file := &File{
+		file := &godup.File{
 			Name: fi.Name(),
 			Size: fi.Size(),
 			Path: path,

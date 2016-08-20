@@ -1,4 +1,4 @@
-package main
+package godup
 
 import (
 	"crypto/sha256"

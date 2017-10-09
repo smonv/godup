@@ -1,7 +1,6 @@
 package godup
 
-// File struct
-type File struct {
+type FileInfo struct {
 	Name string
 	Size int64
 	Path string

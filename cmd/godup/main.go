@@ -1,125 +1,152 @@
 package main
 
 import (
-	"context"
+	"bytes"
+	"crypto/md5"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
-	"runtime"
-	"sync"
 
 	"github.com/tthanh/godup"
+	"github.com/tthanh/godup/pkg/helper"
 )
 
 var (
-	allFile map[int64][]*godup.File
-	count   int64
-	mutex   sync.Mutex
-	wg      sync.WaitGroup
-	ctx     context.Context
-	cancel  context.CancelFunc
+	logger = log.New(os.Stderr, "", 0)
 )
 
 func main() {
+	groups := make(map[int64][]*godup.FileInfo)
 	paths := os.Args[1:]
 
-	allFile = make(map[int64][]*godup.File)
-
 	if len(paths) < 1 {
-		fmt.Println("path not found")
+		logger.Fatal("path not found")
 		return
 	}
 
 	for _, path := range paths {
-		err := check(path)
+		src, err := os.Stat(path)
 		if err != nil {
-			fmt.Println(err)
+			logger.Fatal(err)
+		}
+		if !src.IsDir() {
+			logger.Fatalf("%s is not directory", path)
 		}
 	}
 
-	if len(allFile) == 0 {
-		fmt.Println("cannot find any file")
-		return
-	}
+	for _, path := range paths {
+		path, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			logger.Fatal(err)
+		}
 
-	fmt.Printf("found %d files\n", count)
-
-	ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
-
-	cic := make(chan []*godup.File) // compare input channel
-	coc := make(chan []*godup.File) // compare output channel
-
-	workers := runtime.NumCPU()
-	wg.Add(workers)
-
-	for i := 0; i < workers; i++ {
-		go func() {
-			defer wg.Done()
-			godup.CompareWorker(ctx, cic, coc)
-		}()
-	}
-
-	go func() {
-		wg.Wait()
-		close(coc)
-	}()
-
-	go func() {
-		defer close(cic)
-		for _, files := range allFile {
-			if len(files) > 1 {
-				cic <- files
+		err = filepath.Walk(path, func(path string, fi os.FileInfo, err error) error {
+			if !fi.IsDir() {
+				groups[fi.Size()] = append(groups[fi.Size()], &godup.FileInfo{
+					Name: fi.Name(),
+					Size: fi.Size(),
+					Path: path,
+				})
 			}
-		}
-	}()
 
-	for files := range coc {
-		if len(files) > 1 {
-			fmt.Printf("\n")
-			fmt.Printf("Size: %d. HASH: %x\n", files[0].Size, files[0].Hash)
-			for _, file := range files {
-				fmt.Printf("Path: %s\n", file.Path)
+			return nil
+		})
+
+		if err != nil {
+			logger.Fatal(err)
+		}
+	}
+
+	fmt.Printf("Found %d group of candidate\n", len(groups))
+
+	for _, group := range groups {
+		result, err := validateGroup(group)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if len(result) > 1 {
+			finalResult, sErr := compareBytes(result)
+			if sErr != nil {
+				log.Fatal(err)
+			}
+
+			if len(finalResult) > 1 {
+				fmt.Println("")
+				for _, r := range result {
+					fmt.Printf("%s\t%x\t%s\n", r.Name, r.Hash, r.Path)
+				}
 			}
 		}
 	}
 }
 
-func check(path string) error {
-	src, err := os.Stat(path)
-	if err != nil {
-		return err
+func validateGroup(files []*godup.FileInfo) (results map[string]*godup.FileInfo, err error) {
+	results = make(map[string]*godup.FileInfo)
+
+	for _, file := range files {
+		file.Hash, err = helper.Hash(file.Path)
+		if err != nil {
+			return results, err
+		}
 	}
 
-	if src.IsDir() {
-		fullPath, err := filepath.Abs(path)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Checking %s\n", fullPath)
-		if err = filepath.Walk(fullPath, walker); err != nil {
-			return err
+	for i := 0; i < len(files); i++ {
+		for j := i + 1; j < len(files); j++ {
+			if bytes.Equal(files[i].Hash, files[j].Hash) {
+				_x := md5.Sum([]byte(files[i].Name + files[i].Path))
+				fi := _x[:]
+				if _, ok := results[string(fi)]; !ok {
+					results[string(fi)] = files[i]
+				}
+
+				_x = md5.Sum([]byte(files[j].Name + files[j].Path))
+				fj := _x[:]
+				if _, ok := results[string(fj)]; !ok {
+					results[string(fj)] = files[j]
+				}
+			}
 		}
 	}
-	return nil
+
+	return results, nil
 }
 
-func walker(path string, fi os.FileInfo, err error) error {
-	if !fi.IsDir() {
-		mutex.Lock()
-		defer mutex.Unlock()
+func compareBytes(files map[string]*godup.FileInfo) (results map[string]*godup.FileInfo, err error) {
+	results = make(map[string]*godup.FileInfo)
 
-		count++
-
-		file := &godup.File{
-			Name: fi.Name(),
-			Size: fi.Size(),
-			Path: path,
-		}
-
-		files := allFile[file.Size]
-		files = append(files, file)
-		allFile[file.Size] = files
+	if len(files) < 2 {
+		return results, nil
 	}
-	return nil
+
+	for ki, i := range files {
+		for kj, j := range files {
+			if ki == kj {
+				continue
+			}
+
+			f1, err := ioutil.ReadFile(i.Path)
+			if err != nil {
+				panic(err)
+			}
+
+			f2, err := ioutil.ReadFile(j.Path)
+			if err != nil {
+				panic(err)
+			}
+
+			if bytes.Equal(f1, f2) {
+				if _, ok := results[ki]; !ok {
+					results[ki] = i
+				}
+				if _, ok := results[kj]; !ok {
+					results[kj] = j
+				}
+			}
+		}
+	}
+
+	return results, nil
 }

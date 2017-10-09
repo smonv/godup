@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -82,49 +83,70 @@ func main() {
 	}
 }
 
-func validateGroup(files []*godup.FileInfo) (result []*godup.FileInfo, err error) {
+func validateGroup(files []*godup.FileInfo) (results map[string]*godup.FileInfo, err error) {
+	results = make(map[string]*godup.FileInfo)
+
 	for _, file := range files {
 		file.Hash, err = helper.Hash(file.Path)
 		if err != nil {
-			return result, err
+			return results, err
 		}
 	}
 
 	for i := 0; i < len(files); i++ {
 		for j := i + 1; j < len(files); j++ {
 			if bytes.Equal(files[i].Hash, files[j].Hash) {
-				result = helper.AppendNotExistFile(result, files[i])
-				result = helper.AppendNotExistFile(result, files[j])
+				_x := md5.Sum([]byte(files[i].Name + files[i].Path))
+				fi := _x[:]
+				if _, ok := results[string(fi)]; !ok {
+					results[string(fi)] = files[i]
+				}
+
+				_x = md5.Sum([]byte(files[j].Name + files[j].Path))
+				fj := _x[:]
+				if _, ok := results[string(fj)]; !ok {
+					results[string(fj)] = files[j]
+				}
 			}
 		}
 	}
 
-	return result, nil
+	return results, nil
 }
 
-func compareBytes(files []*godup.FileInfo) (result []*godup.FileInfo, err error) {
+func compareBytes(files map[string]*godup.FileInfo) (results map[string]*godup.FileInfo, err error) {
+	results = make(map[string]*godup.FileInfo)
+
 	if len(files) < 2 {
-		return result, nil
+		return results, nil
 	}
 
-	for i := 0; i < len(files); i++ {
-		for j := i + 1; j < len(files); j++ {
-			f1, err := ioutil.ReadFile(files[i].Path)
+	for ki, i := range files {
+		for kj, j := range files {
+			if ki == kj {
+				continue
+			}
+
+			f1, err := ioutil.ReadFile(i.Path)
 			if err != nil {
 				panic(err)
 			}
 
-			f2, err := ioutil.ReadFile(files[j].Path)
+			f2, err := ioutil.ReadFile(j.Path)
 			if err != nil {
 				panic(err)
 			}
 
 			if bytes.Equal(f1, f2) {
-				result = helper.AppendNotExistFile(result, files[i])
-				result = helper.AppendNotExistFile(result, files[j])
+				if _, ok := results[ki]; !ok {
+					results[ki] = i
+				}
+				if _, ok := results[kj]; !ok {
+					results[kj] = j
+				}
 			}
 		}
 	}
 
-	return result, nil
+	return results, nil
 }

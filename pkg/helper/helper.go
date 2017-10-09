@@ -3,9 +3,6 @@ package helper
 import (
 	"crypto/sha256"
 	"os"
-	"reflect"
-
-	"github.com/tthanh/godup"
 )
 
 // Hash ...
@@ -31,21 +28,4 @@ func Hash(path string) (result []byte, err error) {
 	r := sha256.Sum256(buf)
 	result = r[:]
 	return result, nil
-}
-
-func checkFilesContain(files []*godup.FileInfo, file *godup.FileInfo) bool {
-	for _, f := range files {
-		if reflect.DeepEqual(f, file) {
-			return true
-		}
-	}
-	return false
-}
-
-// AppendNotExistFile ...
-func AppendNotExistFile(files []*godup.FileInfo, file *godup.FileInfo) []*godup.FileInfo {
-	if !checkFilesContain(files, file) {
-		files = append(files, file)
-	}
-	return files
 }

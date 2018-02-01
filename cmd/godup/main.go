@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"sync"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/tthanh/godup"
 )
 
@@ -74,15 +77,34 @@ func main() {
 		}
 	}()
 
+	var tableData [][]string
 	for files := range coc {
 		if len(files) > 1 {
-			fmt.Printf("\n")
-			fmt.Printf("Size: %d. HASH: %x\n", files[0].Size, files[0].Hash)
-			for _, file := range files {
-				fmt.Printf("Path: %s\n", file.Path)
+			for idx, file := range files {
+				var size string
+				var hash string
+				if idx == 0 {
+					size = strconv.FormatInt(file.Size, 10)
+					hash = hex.EncodeToString(file.Hash)
+				}
+
+				tableData = append(tableData, []string{size, hash, file.Path})
+				if idx != len(files)-1 {
+					tableData = append(tableData, []string{"", "", ""})
+				}
 			}
 		}
+
 	}
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Size", "Hash", "Path"})
+
+	for _, r := range tableData {
+		table.Append(r)
+	}
+
+	table.Render()
 }
 
 func check(path string) error {

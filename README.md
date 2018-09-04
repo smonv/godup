@@ -2,7 +2,7 @@
 CLI tool check file duplicate (small files)
 
 # Require:
-go1.7 or higher (using context in stdlib)
+go1.11 or higher
 
 # Usage:
 ```sh
